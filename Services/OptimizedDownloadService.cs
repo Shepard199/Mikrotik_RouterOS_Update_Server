@@ -203,9 +203,9 @@ public class OptimizedDownloadService : IOptimizedDownloadService, IFileDownload
                 {
                     File.Delete(outputPath);
                 }
-                catch
+                catch (Exception cleanupException)
                 {
-                    /* ignore */
+                    _logger.LogDebug(cleanupException, "Failed to delete partial download {Path}", outputPath);
                 }
         }
 

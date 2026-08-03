@@ -369,9 +369,9 @@ public static partial class Program
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
         }
-        catch
+        catch (Exception ex)
         {
-            // intentionally ignored, diagnostics endpoint should stay resilient
+            Debug.WriteLine($"Failed to read registry multi-string '{subKey}\\{valueName}': {ex}");
         }
 
         return [];

@@ -275,9 +275,9 @@ public class FileBasedLogStore : ILogStore, IAsyncDisposable
 
                                 result.Add(entry);
                             }
-                            catch
+                            catch (Exception ex)
                             {
-                                // Пропускаем некорректные строки
+                                _logger.LogDebug(ex, "Skipping malformed log entry in {File}", file);
                             }
                     }
                 }
@@ -331,9 +331,9 @@ public class FileBasedLogStore : ILogStore, IAsyncDisposable
                                 if (stats.NewestEntry == null || entry.Timestamp > stats.NewestEntry)
                                     stats.NewestEntry = entry.Timestamp;
                             }
-                            catch
+                            catch (Exception ex)
                             {
-                                // Пропускаем
+                                _logger.LogDebug(ex, "Skipping malformed log entry in {File}", file);
                             }
                     }
                 }

@@ -592,9 +592,9 @@ internal sealed class UpdateOrchestrator(
                         {
                             File.Delete(tempPath);
                         }
-                        catch
+                        catch (Exception cleanupException)
                         {
-                            // ignore cleanup failures
+                            logger.LogDebug(cleanupException, "Failed to delete temporary download {Path}", tempPath);
                         }
                     }
                 }
@@ -1088,9 +1088,9 @@ internal sealed class UpdateOrchestrator(
             var content = await _upstreamClient.GetStringAsync(url);
             await File.WriteAllTextAsync(changelogPath, content);
         }
-        catch
+        catch (Exception ex)
         {
-            // CHANGELOG optional; ignore failures
+            logger.LogDebug(ex, "Failed to download optional CHANGELOG for RouterOS {Version}", version);
         }
     }
 
@@ -1679,9 +1679,9 @@ internal sealed class UpdateOrchestrator(
             var csv = await _upstreamClient.GetStringAsync(url);
             await File.WriteAllTextAsync(localPath, csv);
         }
-        catch
+        catch (Exception ex)
         {
-            // optional artifact
+            logger.LogDebug(ex, "Failed to download optional packages.csv for RouterOS {Version}", branchVersion);
         }
     }
 
@@ -1723,17 +1723,17 @@ internal sealed class UpdateOrchestrator(
                     entries.Add(versionChangelog);
                     entries.Add("");
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // skip broken changelog entries
+                    logger.LogDebug(ex, "Skipping unreadable CHANGELOG for RouterOS {Version}", version);
                 }
             }
 
             await File.WriteAllLinesAsync(changelogPath, entries);
         }
-        catch
+        catch (Exception ex)
         {
-            // keep update flow resilient even if changelog aggregation fails
+            logger.LogWarning(ex, "Failed to update the global RouterOS CHANGELOG");
         }
     }
 

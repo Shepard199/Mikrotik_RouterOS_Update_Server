@@ -278,9 +278,9 @@ public class HealthCheckService(
                 {
                     File.Delete(Path.Combine(Path.GetTempPath(), ".health-check-test"));
                 }
-                catch
+                catch (Exception cleanupException)
                 {
-                    // ignored
+                    logger.LogDebug(cleanupException, "Failed to delete download health-check file");
                 }
 
                 return new HealthCheckResult
