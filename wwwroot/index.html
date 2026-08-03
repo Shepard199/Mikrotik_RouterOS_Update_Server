@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>MikroTik Update Server</title>
+    <link rel="stylesheet" href="/style.css"/>
+    <script src="/app.js" defer></script>
+</head>
+<body>
+<!-- Toast Container -->
+<div id="toast-container" class="toast-container" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<!-- Sidebar -->
+<div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar" title="Alt+S" data-i18n-aria-label="toggleSidebar" data-i18n-title="toggleSidebarShortcut">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <div class="logo-container">
+            <div class="logo" data-i18n="sidebarLogo">📡 ROS Update</div>
+            <p class="subtitle" data-i18n="localServer">Local Server</p>
+        </div>
+    </div>
+
+    <nav class="sidebar-nav" role="tablist" aria-label="Main sections" data-i18n-aria-label="mainSections">
+        <a href="#" class="nav-link active" id="main-tab-dashboard" data-tab="dashboard" role="tab" aria-selected="true" aria-controls="dashboard" tabindex="0">
+            <span class="nav-icon">📊</span>
+            <span class="nav-text" data-i18n="dashboard">Dashboard</span>
+        </a>
+        <a href="#" class="nav-link" id="main-tab-versions" data-tab="versions" role="tab" aria-selected="false" aria-controls="versions" tabindex="-1">
+            <span class="nav-icon">📦</span>
+            <span class="nav-text" data-i18n="versions">Versions</span>
+        </a>
+        <a href="#" class="nav-link" id="main-tab-logs" data-tab="logs" role="tab" aria-selected="false" aria-controls="logs" tabindex="-1">
+            <span class="nav-icon">📋</span>
+            <span class="nav-text" data-i18n="logs">Logs</span>
+        </a>
+        <a href="#" class="nav-link" id="main-tab-schedule" data-tab="schedule" role="tab" aria-selected="false" aria-controls="schedule" tabindex="-1">
+            <span class="nav-icon">📅</span>
+            <span class="nav-text" data-i18n="schedule">Schedule</span>
+        </a>
+        <a href="#" class="nav-link" id="main-tab-changelog" data-tab="changelog" role="tab" aria-selected="false" aria-controls="changelog" tabindex="-1">
+            <span class="nav-icon">📝</span>
+            <span class="nav-text" data-i18n="changelog">Changelog</span>
+        </a>
+        <a href="#" class="nav-link" id="main-tab-config" data-tab="config" role="tab" aria-selected="false" aria-controls="config" tabindex="-1">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-text" data-i18n="configuration">Configuration</span>
+        </a>
+    </nav>
+
+    <div class="language-selector">
+        <label for="language-select" style="display: none;"></label>
+        <select id="language-select" title="Select UI language" aria-label="Language selector" data-i18n-title="selectLanguage" data-i18n-aria-label="languageSelector">
+        </select>
+    </div>
+
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" title="Toggle dark/light theme" data-i18n-aria-label="toggleTheme" data-i18n-title="toggleTheme">
+        <span class="theme-icon">🌙</span>
+        <span class="theme-label" data-i18n="darkMode">Dark Mode</span>
+    </button>
+
+    <div class="sidebar-footer">
+        <p id="server-status" class="status-indicator">
+            <span class="status-dot"></span>
+            <span class="status-text" data-i18n="offline">Offline</span>
+        </p>
+        <p class="version-text">v1.0.0</p>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="main-content">
+<!-- Breadcrumb Navigation -->
+<nav id="breadcrumb" class="breadcrumb" aria-label="Breadcrumb" data-i18n-aria-label="breadcrumb"></nav>
+
+<!-- Dashboard Tab -->
+<div id="dashboard" class="tab-pane active" role="tabpanel" aria-labelledby="main-tab-dashboard" tabindex="0">
+    <header class="page-header">
+        <div class="header-content">
+            <h1 data-i18n="appHeader">📡 MikroTik ROS Update Server</h1>
+            <p class="header-subtitle" data-i18n="monitorManage">Monitor and manage RouterOS updates</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-primary" id="check-updates-btn" aria-label="Check for new RouterOS updates" data-i18n-aria-label="checkForNewUpdates">
+                <span class="btn-icon">🔄</span>
+                <span class="btn-text" data-i18n="checkUpdates">Check Updates</span>
+            </button>
+            <button class="btn btn-secondary" id="open-shortcuts-btn" title="Show keyboard shortcuts" aria-label="Show keyboard shortcuts" data-i18n-title="showKeyboardShortcuts" data-i18n-aria-label="showKeyboardShortcuts">
+                <span class="btn-icon">⌨️</span>
+                <span class="btn-text" data-i18n="shortcuts">Shortcuts</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="grid-container">
+        <div class="card status-card">
+            <div class="card-header">
+                <span class="card-icon">💻</span>
+                <span class="card-title" data-i18n="systemStatus">System Status</span>
+            </div>
+            <div class="card-content">
+                <div class="status-item">
+                    <span class="status-label">
+                        <span class="label-icon">🕐</span>
+                        <span data-i18n="lastCheck">Last Check</span>
+                    </span>
+                    <span class="status-value" id="last-check">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">
+                        <span class="label-icon">⏱️</span>
+                        <span data-i18n="uptime">Uptime</span>
+                    </span>
+                    <span class="status-value" id="uptime">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">
+                        <span class="label-icon">🧠</span>
+                        <span data-i18n="ramUsage">RAM Usage</span>
+                    </span>
+                    <span class="status-value" id="memory">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">
+                        <span class="label-icon">💾</span>
+                        <span data-i18n="diskSpace">Disk Space</span>
+                    </span>
+                    <span class="status-value" id="disk">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">
+                        <span class="label-icon">🔢</span>
+                        <span data-i18n="threadPool">ThreadPool</span>
+                    </span>
+                    <span class="status-value" id="threads">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">
+                        <span class="label-icon">⚡</span>
+                        <span data-i18n="cpuUsage">CPU Usage</span>
+                    </span>
+                    <span class="status-value" id="cpuUsage">-</span>
+                </div>
+                <div class="status-item status-item-multiline">
+                    <span class="status-label">
+                        <span class="label-icon">🔐</span>
+                        <span data-i18n="tlsProbe">TLS Probe</span>
+                    </span>
+                    <span class="status-value" id="tls-probe">-</span>
+                </div>
+                <div class="status-item status-item-multiline">
+                    <span class="status-label">
+                        <span class="label-icon">🧾</span>
+                        <span data-i18n="tlsDetails">TLS Details</span>
+                    </span>
+                    <span class="status-value status-value-wrap" id="tls-details">-</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card stats-card">
+            <div class="card-header">
+                <span class="card-icon">📥</span>
+                <span class="card-title" data-i18n="downloads">Downloads</span>
+            </div>
+            <div class="card-content stats-content">
+                <div class="stat-box">
+                    <div class="stat-icon">📄</div>
+                    <div class="stat-number" id="total-files">0</div>
+                    <div class="stat-label" data-i18n="files">Files</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-icon">💿</div>
+                    <div class="stat-number" id="total-gb">0</div>
+                    <div class="stat-label" data-i18n="gb">GB</div>
+                </div>
+            </div>
+            <div class="download-current">
+                <span class="download-current-label" data-i18n="currentMikroTikDownload">Current MikroTik download:</span>
+                <span class="download-current-file" id="current-ros-file">-</span>
+            </div>
+            <div class="download-current-meta" id="current-ros-meta" data-i18n="noActiveMikroTikDownload">No active MikroTik download</div>
+        </div>
+    </div>
+
+    <section class="versions-overview">
+        <h2 class="section-title" data-i18n="activeVersions">Active Versions</h2>
+        <div class="versions-grid">
+            <div class="version-badge v6">
+                <div class="badge-icon">🟢</div>
+                <div class="badge-title" data-i18n="routerOSv6">RouterOS v6</div>
+                <div class="badge-version" id="v6-active">-</div>
+            </div>
+            <div class="version-badge v7-fixed">
+                <div class="badge-icon">🔵</div>
+                <div class="badge-title" data-i18n="v7Fixed">v7 Fixed</div>
+                <div class="badge-version" id="v7-fixed">-</div>
+            </div>
+            <div class="version-badge v7-latest">
+                <div class="badge-icon">🟡</div>
+                <div class="badge-title" data-i18n="v7Latest">v7 Latest</div>
+                <div class="badge-version" id="v7-latest">-</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="today-clients-overview">
+        <h2 class="section-title" data-i18n="todayClientUpdates">Today's Client Updates</h2>
+        <div class="table-wrapper">
+            <table class="activity-table" aria-label="Today client update activity" data-i18n-aria-label="todayClientUpdatesAria">
+                <thead>
+                <tr>
+                    <th data-i18n="clientIp">Client IP</th>
+                    <th data-i18n="updatedTo">Updated To</th>
+                    <th data-i18n="file">File</th>
+                    <th data-i18n="requests">Requests</th>
+                    <th data-i18n="lastSeen">Last Seen</th>
+                </tr>
+                </thead>
+                <tbody id="today-clients-list">
+                <tr>
+                    <td colspan="5">
+                        <div class="loading-container">
+                            <div class="spinner"></div>
+                            <div class="loading-text" data-i18n="loadingClientActivity">Loading client activity...</div>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<!-- Versions Tab -->
+<div id="versions" class="tab-pane" role="tabpanel" aria-labelledby="main-tab-versions" tabindex="0" hidden>
+    <header class="page-header">
+        <h2 class="section-title" data-i18n="versionManagement">Version Management</h2>
+    </header>
+
+    <div class="tabs-bar" role="tablist" aria-label="RouterOS version branches" data-i18n-aria-label="routerOsVersionBranches">
+        <button class="tab-btn active" id="version-tab-v6" data-version-tab="v6-versions" role="tab" aria-selected="true" aria-controls="v6-versions" tabindex="0">
+            <span class="tab-icon">🟢</span>
+            <span data-i18n="routerOSv6">RouterOS v6</span>
+        </button>
+        <button class="tab-btn" id="version-tab-v7" data-version-tab="v7-versions" role="tab" aria-selected="false" aria-controls="v7-versions" tabindex="-1">
+            <span class="tab-icon">🔵</span>
+            <span data-i18n="routerOSv7">RouterOS v7</span>
+        </button>
+    </div>
+
+    <div class="search-wrapper">
+        <input type="text" id="versions-search" placeholder="🔍 Search versions..." class="search-input" aria-label="Search versions table" data-i18n-placeholder="searchVersions" data-i18n-aria-label="searchVersionsAria">
+        <span class="search-results-count" id="search-results-count"></span>
+    </div>
+
+    <div class="versions-bulk-actions">
+        <button type="button" class="btn btn-secondary btn-sm" id="select-visible-versions-btn">
+            <span data-i18n="selectVisible">Select visible</span>
+        </button>
+        <button type="button" class="btn btn-danger btn-sm" id="delete-selected-versions-btn">
+            <span data-i18n="deleteSelected">Delete selected</span>
+        </button>
+        <span id="selected-versions-count" class="status-message"></span>
+    </div>
+
+    <div id="v6-versions" class="version-tab active" role="tabpanel" aria-labelledby="version-tab-v6">
+        <div class="table-wrapper">
+            <table class="versions-table">
+                <thead>
+                <tr>
+                    <th data-i18n="select">Select</th>
+                    <th data-i18n="version">Version</th>
+                    <th data-i18n="architectures">Architectures</th>
+                    <th data-i18n="status">Status</th>
+                    <th data-i18n="actions">Actions</th>
+                </tr>
+                </thead>
+                <tbody id="v6-list">
+                <tr>
+                    <td colspan="5">
+                        <div class="loading-container">
+                            <div class="spinner"></div>
+                            <p class="loading-text" data-i18n="loadingVersions">Loading versions...</p>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="v7-versions" class="version-tab" role="tabpanel" aria-labelledby="version-tab-v7" hidden>
+        <div class="table-wrapper">
+            <table class="versions-table">
+                <thead>
+                <tr>
+                    <th data-i18n="select">Select</th>
+                    <th data-i18n="version">Version</th>
+                    <th data-i18n="architectures">Architectures</th>
+                    <th data-i18n="type">Type</th>
+                    <th data-i18n="status">Status</th>
+                    <th data-i18n="actions">Actions</th>
+                </tr>
+                </thead>
+                <tbody id="v7-list">
+                <tr>
+                    <td colspan="6">
+                        <div class="loading-container">
+                            <div class="spinner"></div>
+                            <p class="loading-text" data-i18n="loadingVersions">Loading versions...</p>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Logs Tab -->
+<div id="logs" class="tab-pane" role="tabpanel" aria-labelledby="main-tab-logs" tabindex="0" hidden>
+    <header class="page-header">
+        <h2 class="section-title" data-i18n="logViewerWithIcon">📋 Log Viewer</h2>
+    </header>
+
+    <div class="logs-controls">
+        <div class="filters-row">
+            <div class="filter-group">
+                <label data-i18n="levelWithColon">Level:</label>
+                <select id="log-level">
+                    <option value="" data-i18n="allLevels">All Levels</option>
+                    <option value="Information" data-i18n="information">Information</option>
+                    <option value="Warning" data-i18n="warning">Warning</option>
+                    <option value="Error" data-i18n="error">Error</option>
+                    <option value="Debug" data-i18n="debug">Debug</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label data-i18n="searchWithColon">Search:</label>
+                <input type="text" id="log-search" placeholder="Search in logs..." data-i18n-placeholder="searchInLogs"/>
+            </div>
+
+            <div class="filter-group">
+                <label data-i18n="showWithColon">Show:</label>
+                <select id="log-limit">
+                    <option value="50" data-i18n="entries50">50 entries</option>
+                    <option value="100" selected data-i18n="entries100">100 entries</option>
+                    <option value="200" data-i18n="entries200">200 entries</option>
+                    <option value="500" data-i18n="entries500">500 entries</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="console-log-controls">
+            <div class="filter-group console-log-toggle">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="console-logs-enabled"/>
+                    <span data-i18n="consoleLogsEnabled">Enable server console logs</span>
+                </label>
+            </div>
+
+            <div class="filter-group console-log-level-group">
+                <label for="console-log-level" data-i18n="consoleLogLevelWithColon">Server Console Level:</label>
+                <select id="console-log-level">
+                    <option value="Debug" data-i18n="debug">Debug</option>
+                    <option value="Information" data-i18n="information">Information</option>
+                    <option value="Warning" data-i18n="warning">Warning</option>
+                    <option value="Error" data-i18n="error">Error</option>
+                </select>
+            </div>
+
+            <button class="btn btn-secondary" id="save-console-logs-btn">
+                <span class="btn-icon">🖥️</span>
+                <span class="btn-text" data-i18n="saveConsoleLogSettings">Save Console Logs</span>
+            </button>
+
+            <span id="console-logs-status" class="status-message"></span>
+        </div>
+
+        <div class="logs-actions">
+            <button class="btn btn-primary" id="refresh-logs-btn" aria-label="Refresh logs" data-i18n-aria-label="refreshLogs">
+                <span class="btn-icon">🔄</span>
+                <span class="btn-text" data-i18n="refresh">Refresh</span>
+            </button>
+            <button class="btn btn-secondary" id="download-logs-btn" aria-label="Download logs" data-i18n-aria-label="downloadLogs">
+                <span class="btn-icon">📥</span>
+                <span class="btn-text" data-i18n="download">Download</span>
+            </button>
+            <button class="btn btn-secondary" id="clear-log-filters-btn" aria-label="Clear filters" data-i18n-aria-label="clearFilters">
+                <span class="btn-icon">🗑️</span>
+                <span class="btn-text" data-i18n="clear">Clear</span>
+            </button>
+            <label class="auto-refresh">
+                <input type="checkbox" id="auto-refresh"/>
+                <span data-i18n="autoRefresh">Auto-refresh (10s)</span>
+            </label>
+        </div>
+    </div>
+
+    <div class="logs-stats" id="logs-stats"></div>
+
+    <div class="logs-container">
+        <div class="logs-header">
+            <span class="log-col timestamp" data-i18n="timestamp">Timestamp</span>
+            <span class="log-col level" data-i18n="level">Level</span>
+            <span class="log-col source" data-i18n="source">Source</span>
+            <span class="log-col message" data-i18n="message">Message</span>
+        </div>
+        <div class="logs-content" id="logs-content">
+            <div class="loading-container">
+                <div class="spinner"></div>
+                <p class="loading-text" data-i18n="loadingLogs">Loading logs...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Schedule Tab -->
+<div id="schedule" class="tab-pane" role="tabpanel" aria-labelledby="main-tab-schedule" tabindex="0" hidden>
+    <header class="page-header">
+        <h2 class="section-title" data-i18n="updateScheduleWithIcon">📅 Update Schedule</h2>
+    </header>
+
+    <div class="schedule-cards-wrapper">
+        <div class="schedule-status-card">
+            <div class="status-header">
+                <h3 data-i18n="scheduleStatus">Schedule Status</h3>
+                <span class="status-badge" id="schedule-status-badge" data-i18n="loading">Loading...</span>
+            </div>
+            <div class="status-details">
+                <div class="status-item">
+                    <span class="label" data-i18n="nextCheckWithColon">Next Check:</span>
+                    <span class="value" id="next-check-time">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="label" data-i18n="timeUntilWithColon">Time Until:</span>
+                    <span class="value" id="time-until-check">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="label" data-i18n="pausedUntilWithColon">Paused Until:</span>
+                    <span class="value" id="paused-until">-</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="schedule-config">
+            <h3 data-i18n="configuration">Configuration</h3>
+            <form id="schedule-form">
+                <div class="schedule-columns">
+                    <div class="schedule-column-left">
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="schedule-enabled" name="enabled"/>
+                                <span data-i18n="enableScheduled">Enable Scheduled Updates</span>
+                            </label>
+                        </div>
+
+                        <div class="form-group">
+                            <label data-i18n="checkTimeWithColon">Check Time:</label>
+                            <input type="time" id="check-time" name="checkTime" value="02:00"/>
+                            <small data-i18n="serverCheckTimeHint">Server time when updates should be checked</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label data-i18n="checkIntervalWithColon">Check Interval (minutes):</label>
+                            <input type="number" id="check-interval" name="intervalMinutes" value="60" min="10" max="1440"/>
+                            <small data-i18n="checkIntervalHint">How often to check for updates (10-1440 minutes)</small>
+                        </div>
+                    </div>
+
+                    <div class="schedule-column-right">
+                        <div class="form-group">
+                            <label data-i18n="daysOfWeekWithColon">Days of Week:</label>
+                            <div class="days-selector">
+                                <label class="day-checkbox">
+                                    <input type="checkbox" name="days" value="Monday" checked/>
+                                    <span data-i18n="mon">Mon</span>
+                                </label>
+                                <label class="day-checkbox">
+                                    <input type="checkbox" name="days" value="Tuesday" checked/>
+                                    <span data-i18n="tue">Tue</span>
+                                </label>
+                                <label class="day-checkbox">
+                                    <input type="checkbox" name="days" value="Wednesday" checked/>
+                                    <span data-i18n="wed">Wed</span>
+                                </label>
+                                <label class="day-checkbox">
+                                    <input type="checkbox" name="days" value="Thursday" checked/>
+                                    <span data-i18n="thu">Thu</span>
+                                </label>
+                                <label class="day-checkbox">
+                                    <input type="checkbox" name="days" value="Friday" checked/>
+                                    <span data-i18n="fri">Fri</span>
+                                </label>
+                                <label class="day-checkbox">
+                                    <input type="checkbox" name="days" value="Saturday" checked/>
+                                    <span data-i18n="sat">Sat</span>
+                                </label>
+                                <label class="day-checkbox">
+                                    <input type="checkbox" name="days" value="Sunday" checked/>
+                                    <span data-i18n="sun">Sun</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label data-i18n="notificationsWithColon">Notifications:</label>
+                            <div class="notifications-settings">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="notify-completion" name="notifyOnCompletion" checked/>
+                                    <span data-i18n="notifyCompletion">Notify on update completion</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="notify-errors" name="notifyOnError" checked/>
+                                    <span data-i18n="notifyErrors">Notify on errors</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" aria-label="Save schedule" data-i18n-aria-label="saveSchedule">
+                        <span class="btn-icon">💾</span>
+                        <span class="btn-text" data-i18n="saveSchedule">Save Schedule</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="pause-schedule-btn" aria-label="Pause schedule" data-i18n-aria-label="pauseSchedule">
+                        <span class="btn-icon">⏸️</span>
+                        <span class="btn-text" data-i18n="pauseFor">Pause for</span>
+                    </button>
+                    <select id="pause-duration" aria-label="Pause duration" data-i18n-aria-label="pauseDuration">
+                        <option value="1" data-i18n="pause1h">1 hour</option>
+                        <option value="4" data-i18n="pause4h">4 hours</option>
+                        <option value="8" data-i18n="pause8h">8 hours</option>
+                        <option value="24" data-i18n="pause24h">24 hours</option>
+                        <option value="72" data-i18n="pause72h">3 days</option>
+                    </select>
+                    <button type="button" class="btn btn-success" id="resume-schedule-btn">
+                        <span class="btn-icon">▶️</span>
+                        <span class="btn-text" data-i18n="resume">Resume</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Changelog Tab -->
+<div id="changelog" class="tab-pane" role="tabpanel" aria-labelledby="main-tab-changelog" tabindex="0" hidden>
+    <header class="page-header">
+        <h2 class="section-title" data-i18n="changelog">Changelog</h2>
+    </header>
+
+    <div class="tabs-bar" role="tablist" aria-label="Changelog views" data-i18n-aria-label="changelogViews">
+        <button class="tab-btn active" id="changelog-tab-global" data-changelog-tab="global-changelog" role="tab" aria-selected="true" aria-controls="global-changelog" tabindex="0">
+            <span data-i18n="globalWithIcon">📋 Global</span>
+        </button>
+        <button class="tab-btn" id="changelog-tab-version" data-changelog-tab="version-changelog" role="tab" aria-selected="false" aria-controls="version-changelog" tabindex="-1">
+            <span data-i18n="versionSpecificWithIcon">📝 Version Specific</span>
+        </button>
+        <button class="tab-btn" id="changelog-tab-history" data-changelog-tab="history" role="tab" aria-selected="false" aria-controls="history" tabindex="-1">
+            <span data-i18n="historyWithIcon">📚 History</span>
+        </button>
+    </div>
+
+    <div id="global-changelog" class="changelog-tab active" role="tabpanel" aria-labelledby="changelog-tab-global">
+        <div class="changelog-container">
+            <div class="changelog-header">
+                <h3 data-i18n="currentVersionsChangelog">Current Versions Changelog</h3>
+                <button class="btn btn-sm btn-primary" id="refresh-global-changelog-btn">
+                    <span data-i18n="refreshWithIcon">🔄 Refresh</span>
+                </button>
+            </div>
+            <div id="global-changelog-content" class="changelog-content">
+                <div class="loading-container">
+                    <div class="spinner"></div>
+                    <p class="loading-text" data-i18n="loadingChangelog">Loading changelog...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="version-changelog" class="changelog-tab" role="tabpanel" aria-labelledby="changelog-tab-version" hidden>
+        <div class="changelog-container">
+            <div class="changelog-header">
+                <h3 data-i18n="changelogForVersion">Changelog for Specific Version</h3>
+                <div class="changelog-controls">
+                    <select id="version-select">
+                        <option value="" data-i18n="selectVersion">Select a version...</option>
+                    </select>
+                    <button class="btn btn-sm btn-primary" id="load-version-changelog-btn">
+                        <span data-i18n="loadWithIcon">📖 Load</span>
+                    </button>
+                </div>
+            </div>
+            <div id="version-changelog-content" class="changelog-content">
+                <p class="empty-state" data-i18n="emptyState">Select a version to view its changelog</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="history" class="changelog-tab" role="tabpanel" aria-labelledby="changelog-tab-history" hidden>
+        <div class="changelog-container">
+            <div class="changelog-header">
+                <h3 data-i18n="versionHistory">Version History</h3>
+                <button class="btn btn-sm btn-primary" id="refresh-version-history-btn">
+                    <span data-i18n="refreshWithIcon">🔄 Refresh</span>
+                </button>
+            </div>
+            <div id="history-content" class="changelog-content">
+                <div class="table-wrapper">
+                    <table class="history-table">
+                        <thead>
+                        <tr>
+                            <th data-i18n="timestamp">Timestamp</th>
+                            <th data-i18n="v6Stable">v6 Stable</th>
+                            <th data-i18n="v7Fixed">v7 Fixed</th>
+                            <th data-i18n="v7Latest">v7 Latest</th>
+                        </tr>
+                        </thead>
+                        <tbody id="history-list">
+                        <tr>
+                            <td colspan="4">
+                                <div class="loading-container">
+                                    <div class="spinner"></div>
+                                    <p class="loading-text" data-i18n="loadingHistory">Loading history...</p>
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Config Tab -->
+<div id="config" class="tab-pane" role="tabpanel" aria-labelledby="main-tab-config" tabindex="0" hidden>
+<header class="page-header">
+    <h2 class="section-title" data-i18n="configuration">Configuration</h2>
+</header>
+
+<div class="config-grid">
+    <div class="config-section">
+        <h3 data-i18n="setupOnMikroTik">Setup on MikroTik</h3>
+        <p data-i18n="addDNS">Add DNS static entry</p>
+        <div class="code-block">
+            <code id="dns-code">/ip dns static add name="upgrade.mikrotik.com" address=YOUR_IP</code>
+            <button class="btn btn-sm btn-secondary copy-btn" data-copy-target="dns-code" aria-label="Copy DNS configuration" data-i18n-aria-label="copyDnsConfiguration">
+                <span data-i18n="copyWithIcon">📋 Copy</span>
+            </button>
+        </div>
+        <p data-i18n="checkForUpdatesWithColon">Check for updates:</p>
+        <div class="code-block">
+            <code id="check-code">/system package update check-for-updates</code>
+            <button class="btn btn-sm btn-secondary copy-btn" data-copy-target="check-code" aria-label="Copy check command" data-i18n-aria-label="copyCheckCommand">
+                <span data-i18n="copyWithIcon">📋 Copy</span>
+            </button>
+        </div>
+        <p data-i18n="installWithColon">Install:</p>
+        <div class="code-block">
+            <code id="install-code">/system package update install</code>
+            <button class="btn btn-sm btn-secondary copy-btn" data-copy-target="install-code" aria-label="Copy install command" data-i18n-aria-label="copyInstallCommand">
+                <span data-i18n="copyWithIcon">📋 Copy</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="config-section">
+        <h3 data-i18n="allowedArchitectures">Allowed RouterOS Architectures</h3>
+        <p data-i18n="selectArchitectures">Select which MikroTik RouterOS architectures should be downloaded and stored by this server.</p>
+        <div class="checkbox-grid" id="arches-container">
+            <label class="arch-checkbox">
+                <input type="checkbox" value="arm"/>
+                <span class="arch-label" data-i18n="arm">ARM</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="arm64"/>
+                <span class="arch-label" data-i18n="arm64">ARM64</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="mipsbe"/>
+                <span class="arch-label" data-i18n="mipsbe">MIPSBE</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="mmips"/>
+                <span class="arch-label" data-i18n="mmips">MMIPS</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="smips"/>
+                <span class="arch-label" data-i18n="smips">SMIPS</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="tile"/>
+                <span class="arch-label" data-i18n="tile">TILE</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="ppc"/>
+                <span class="arch-label" data-i18n="ppc">PPC</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="x86"/>
+                <span class="arch-label" data-i18n="x86">x86</span>
+            </label>
+        </div>
+        <div class="form-actions">
+            <button type="button" class="btn btn-primary" id="save-arches-btn" aria-label="Save architectures" data-i18n-aria-label="saveArchitectures">
+                <span class="btn-icon">💾</span>
+                <span class="btn-text" data-i18n="saveArchitectures">Save Architectures</span>
+            </button>
+            <span id="arches-status" class="status-message"></span>
+        </div>
+    </div>
+
+    <div class="config-section">
+        <h3 data-i18n="v7ExtraPackages">RouterOS v7 Extra Packages</h3>
+        <p data-i18n="selectPackages">Select which extra packages should be downloaded for RouterOS v7.</p>
+        <div class="checkbox-grid" id="v7-packages-container">
+            <label class="arch-checkbox">
+                <input type="checkbox" value="container"/>
+                <span class="arch-label" data-i18n="container">Container</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="dude"/>
+                <span class="arch-label" data-i18n="dude">The Dude</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="extra-nic"/>
+                <span class="arch-label" data-i18n="extraNic">Extra NIC</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="gps"/>
+                <span class="arch-label" data-i18n="gps">GPS</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="iot"/>
+                <span class="arch-label" data-i18n="iot">IoT</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="iot-bt-extra"/>
+                <span class="arch-label" data-i18n="iotBtExtra">IoT Bluetooth Extra</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="lora"/>
+                <span class="arch-label" data-i18n="lora">LoRa</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="lte"/>
+                <span class="arch-label" data-i18n="lte">LTE</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="rose-storage"/>
+                <span class="arch-label" data-i18n="roseStorage">ROSE Storage</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="switch-marvell"/>
+                <span class="arch-label" data-i18n="switchMarvell">Switch Marvell</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="ups"/>
+                <span class="arch-label" data-i18n="ups">UPS</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="user-manager"/>
+                <span class="arch-label" data-i18n="userManager">User Manager</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="wifi-qcom"/>
+                <span class="arch-label" data-i18n="wifiQcom">WiFi QCOM</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="wifi-qcom-ac"/>
+                <span class="arch-label" data-i18n="wifiQcomAc">WiFi QCOM AC</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="wireless"/>
+                <span class="arch-label" data-i18n="wireless">Wireless</span>
+            </label>
+            <label class="arch-checkbox">
+                <input type="checkbox" value="zerotier"/>
+                <span class="arch-label" data-i18n="zerotier">ZeroTier</span>
+            </label>
+        </div>
+        <div class="form-actions">
+            <button type="button" class="btn btn-primary" id="save-v7-packages-btn" aria-label="Save v7 packages" data-i18n-aria-label="saveV7Packages">
+                <span class="btn-icon">💾</span>
+                <span class="btn-text" data-i18n="savePackages">Save Packages</span>
+            </button>
+            <span id="v7-packages-status" class="status-message"></span>
+        </div>
+    </div>
+</div>
+
+<div class="config-section pointer-routing-section">
+    <h3 data-i18n="pointerRouting">Pointer Routing</h3>
+    <p data-i18n="pointerRoutingDesc">Choose which local branch each pointer file should serve.</p>
+
+    <h4 class="pointer-branch-title" data-i18n="branchLatestVersions">Latest upstream versions per branch</h4>
+    <div class="pointer-branch-summary">
+        <div class="pointer-branch-card">
+            <span class="pointer-branch-label" data-i18n="branchV6Label">v6</span>
+            <span class="pointer-branch-value" id="pointer-branch-v6">-</span>
+        </div>
+        <div class="pointer-branch-card">
+            <span class="pointer-branch-label" data-i18n="branchV7FixedLabel">v7Fixed</span>
+            <span class="pointer-branch-value" id="pointer-branch-v7fixed">-</span>
+        </div>
+        <div class="pointer-branch-card">
+            <span class="pointer-branch-label" data-i18n="branchV7LatestLabel">v7Latest</span>
+            <span class="pointer-branch-value" id="pointer-branch-v7latest">-</span>
+        </div>
+    </div>
+
+    <div class="table-wrapper">
+        <table class="activity-table pointer-routing-table" aria-label="Pointer branch routing" data-i18n-aria-label="pointerBranchRouting">
+            <thead>
+            <tr>
+                <th data-i18n="pointerFile">Pointer File</th>
+                <th data-i18n="activeBranch">Active Branch</th>
+                <th data-i18n="defaultBranch">Default Branch</th>
+                <th data-i18n="servedVersion">Served Version</th>
+                <th data-i18n="upstreamVersion">Upstream Latest</th>
+            </tr>
+            </thead>
+            <tbody id="pointer-routing-list">
+            <tr>
+                <td colspan="5">
+                    <div class="loading-container">
+                        <div class="spinner"></div>
+                        <div class="loading-text" data-i18n="loadingPointerRouting">Loading pointer routing...</div>
+                    </div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="reload-pointer-routing-btn" aria-label="Reload pointer routing" data-i18n-aria-label="reloadPointerRouting">
+            <span class="btn-icon">🔄</span>
+            <span class="btn-text" data-i18n="reloadPointerRouting">Reload Routing</span>
+        </button>
+        <span id="pointer-routing-status" class="status-message"></span>
+    </div>
+</div>
+
+<div class="config-section">
+    <h3 data-i18n="deletePrefix">Delete Prefixes Configuration</h3>
+    <p data-i18n="deletePrefixDesc">Configure which file prefixes should be deleted when downloading updates packges</p>
+    <textarea id="delete-prefixes-textarea" class="code-textarea" placeholder='["prefix1", "prefix2"]' rows="8"></textarea>
+    <div class="form-actions">
+        <button type="button" class="btn btn-primary" id="save-delete-prefixes-btn" aria-label="Save delete prefixes" data-i18n-aria-label="saveDeletePrefixes">
+            <span class="btn-icon">💾</span>
+            <span class="btn-text" data-i18n="saveDeletePrefixes">Save Delete Prefixes</span>
+        </button>
+        <button type="button" class="btn btn-secondary" id="reload-delete-prefixes-btn" aria-label="Reload delete prefixes" data-i18n-aria-label="reloadDeletePrefixes">
+            <span class="btn-icon">🔄</span>
+            <span class="btn-text" data-i18n="reload">Reload</span>
+        </button>
+        <span id="prefixes-status" class="status-message"></span>
+    </div>
+</div>
+
+<div class="config-section">
+    <h3 data-i18n="settingsBackup">Settings Backup</h3>
+    <p data-i18n="settingsBackupDesc">Export and import your schedule configuration</p>
+    <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="export-settings-btn" aria-label="Export settings" data-i18n-aria-label="exportSettings">
+            <span class="btn-icon">📤</span>
+            <span class="btn-text" data-i18n="exportSettings">Export Settings</span>
+        </button>
+        <button type="button" class="btn btn-secondary" id="import-settings-btn" aria-label="Import settings" data-i18n-aria-label="importSettings">
+            <span class="btn-icon">📥</span>
+            <span class="btn-text" data-i18n="importSettings">Import Settings</span>
+        </button>
+        <input type="file" id="import-file" style="display: none;" accept=".json" aria-label="Import file" data-i18n-aria-label="importFile"/>
+    </div>
+</div>
+</div>
+</div>
+
+<!-- Shortcuts Modal -->
+<div id="shortcuts-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 data-i18n="keyboardShortcutsWithIcon">⌨️ Keyboard Shortcuts</h2>
+            <button class="modal-close" id="close-shortcuts-modal-btn" title="Close (Esc)" aria-label="Close modal" data-i18n-title="closeEsc" data-i18n-aria-label="closeModal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="shortcuts-grid">
+                <div class="shortcut-item">
+                    <kbd>Alt</kbd><kbd>1</kbd>
+                    <span data-i18n="dashboard">Dashboard</span>
+                </div>
+                <div class="shortcut-item">
+                    <kbd>Alt</kbd><kbd>2</kbd>
+                    <span data-i18n="versions">Versions</span>
+                </div>
+                <div class="shortcut-item">
+                    <kbd>Alt</kbd><kbd>3</kbd>
+                    <span data-i18n="logs">Logs</span>
+                </div>
+                <div class="shortcut-item">
+                    <kbd>Alt</kbd><kbd>4</kbd>
+                    <span data-i18n="schedule">Schedule</span>
+                </div>
+                <div class="shortcut-item">
+                    <kbd>Alt</kbd><kbd>5</kbd>
+                    <span data-i18n="changelog">Changelog</span>
+                </div>
+                <div class="shortcut-item">
+                    <kbd>Alt</kbd><kbd>6</kbd>
+                    <span data-i18n="configuration">Configuration</span>
+                </div>
+                <div class="shortcut-item">
+                    <kbd>Alt</kbd><kbd>S</kbd>
+                    <span data-i18n="toggleSidebar">Toggle Sidebar</span>
+                </div>
+                <div class="shortcut-item">
+                    <kbd>Ctrl</kbd><kbd>K</kbd>
+                    <span data-i18n="focusSearch">Focus Search</span>
+                </div>
+                <div class="shortcut-item">
+                    <kbd>Esc</kbd>
+                    <span data-i18n="closeDialog">Close Dialog</span>
+                </div>
+                <div class="shortcut-item">
+                    <kbd>?</kbd>
+                    <span data-i18n="showHelp">Show This Help</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

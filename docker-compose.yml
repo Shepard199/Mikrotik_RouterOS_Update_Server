@@ -1,0 +1,33 @@
+version: '3.9'
+
+services:
+  mikrotik-updateserver:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mikrotik-updateserver:latest
+    container_name: mikrotik-updateserver
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./logs:/app/logs:rw
+      - ./routeros:/app/routeros:rw
+      - ./appsettings.json:/app/appsettings.json:ro
+      - ./appsettings.Development.json:/app/appsettings.Development.json:ro
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:5000
+      DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "false"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - mikrotik-network
+
+networks:
+  mikrotik-network:
+    driver: bridge
