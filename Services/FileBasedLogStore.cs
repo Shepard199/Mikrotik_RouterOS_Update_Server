@@ -251,34 +251,26 @@ public class FileBasedLogStore : ILogStore, IAsyncDisposable
 
                 try
                 {
-                    using (var reader = new StreamReader(file))
+                    foreach (var entry in ReadEntriesFromFile(file))
                     {
-                        while (reader.ReadLine() is { } line && result.Count < take)
-                            try
-                            {
-                                var entry = JsonSerializer.Deserialize<LogEntry>(line);
-                                if (entry == null) continue;
+                        if (result.Count >= take)
+                            break;
 
-                                // Применяем фильтры
-                                if (!string.IsNullOrWhiteSpace(level) &&
-                                    !string.Equals(entry.Level, level, StringComparison.OrdinalIgnoreCase))
-                                    continue;
+                        // Применяем фильтры
+                        if (!string.IsNullOrWhiteSpace(level) &&
+                            !string.Equals(entry.Level, level, StringComparison.OrdinalIgnoreCase))
+                            continue;
 
-                                if (!string.IsNullOrWhiteSpace(search))
-                                {
-                                    var s = search.ToLowerInvariant();
-                                    if (!entry.Source.ToLowerInvariant().Contains(s) &&
-                                        !entry.Message.ToLowerInvariant().Contains(s) &&
-                                        (entry.Exception == null || !entry.Exception.ToLowerInvariant().Contains(s)))
-                                        continue;
-                                }
+                        if (!string.IsNullOrWhiteSpace(search))
+                        {
+                            var s = search.ToLowerInvariant();
+                            if (!entry.Source.ToLowerInvariant().Contains(s) &&
+                                !entry.Message.ToLowerInvariant().Contains(s) &&
+                                (entry.Exception == null || !entry.Exception.ToLowerInvariant().Contains(s)))
+                                continue;
+                        }
 
-                                result.Add(entry);
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogDebug(ex, "Skipping malformed log entry in {File}", file);
-                            }
+                        result.Add(entry);
                     }
                 }
                 catch (Exception ex)
@@ -309,32 +301,21 @@ public class FileBasedLogStore : ILogStore, IAsyncDisposable
             foreach (var file in logFiles)
                 try
                 {
-                    using (var reader = new StreamReader(file))
+                    foreach (var entry in ReadEntriesFromFile(file))
                     {
-                        while (reader.ReadLine() is { } line)
-                            try
-                            {
-                                var entry = JsonSerializer.Deserialize<LogEntry>(line);
-                                if (entry == null) continue;
+                        stats.TotalEntries++;
 
-                                stats.TotalEntries++;
+                        if (string.Equals(entry.Level, "Information", StringComparison.OrdinalIgnoreCase))
+                            stats.InfoCount++;
+                        else if (string.Equals(entry.Level, "Warning", StringComparison.OrdinalIgnoreCase))
+                            stats.WarningCount++;
+                        else if (string.Equals(entry.Level, "Error", StringComparison.OrdinalIgnoreCase))
+                            stats.ErrorCount++;
 
-                                if (string.Equals(entry.Level, "Information", StringComparison.OrdinalIgnoreCase))
-                                    stats.InfoCount++;
-                                else if (string.Equals(entry.Level, "Warning", StringComparison.OrdinalIgnoreCase))
-                                    stats.WarningCount++;
-                                else if (string.Equals(entry.Level, "Error", StringComparison.OrdinalIgnoreCase))
-                                    stats.ErrorCount++;
-
-                                if (stats.OldestEntry == null || entry.Timestamp < stats.OldestEntry)
-                                    stats.OldestEntry = entry.Timestamp;
-                                if (stats.NewestEntry == null || entry.Timestamp > stats.NewestEntry)
-                                    stats.NewestEntry = entry.Timestamp;
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogDebug(ex, "Skipping malformed log entry in {File}", file);
-                            }
+                        if (stats.OldestEntry == null || entry.Timestamp < stats.OldestEntry)
+                            stats.OldestEntry = entry.Timestamp;
+                        if (stats.NewestEntry == null || entry.Timestamp > stats.NewestEntry)
+                            stats.NewestEntry = entry.Timestamp;
                     }
                 }
                 catch (Exception ex)
@@ -348,5 +329,34 @@ public class FileBasedLogStore : ILogStore, IAsyncDisposable
         }
 
         return stats;
+    }
+
+    private List<LogEntry> ReadEntriesFromFile(string file)
+    {
+        var entries = new List<LogEntry>();
+
+        try
+        {
+            var reader = new Utf8JsonReader(
+                File.ReadAllBytes(file),
+                new JsonReaderOptions { AllowMultipleValues = true });
+
+            while (reader.Read())
+            {
+                if (reader.TokenType != JsonTokenType.StartObject)
+                    continue;
+
+                using var document = JsonDocument.ParseValue(ref reader);
+                var entry = document.Deserialize<LogEntry>();
+                if (entry is not null)
+                    entries.Add(entry);
+            }
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogDebug("Skipping malformed log data in {File}: {Message}", file, ex.Message);
+        }
+
+        return entries;
     }
 }

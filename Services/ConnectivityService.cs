@@ -27,7 +27,7 @@ public class ConnectivityService : IConnectivityService
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             using var request =
                 new HttpRequestMessage(HttpMethod.Head, "https://upgrade.mikrotik.com/routeros/LATEST.6");
-            var response = await _httpClient.SendAsync(request, cts.Token);
+            using var response = await _httpClient.SendAsync(request, cts.Token);
 
             var isConnected = response.IsSuccessStatusCode;
             _logger.LogInformation("MikroTik server connectivity: {Status}", isConnected ? "✓ OK" : "✗ FAILED");
@@ -54,19 +54,30 @@ public class ConnectivityService : IConnectivityService
     {
         try
         {
-            _logger.LogInformation("Checking internet connectivity...");
+            _logger.LogInformation("Checking connectivity to download.mikrotik.com...");
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            using var request = new HttpRequestMessage(HttpMethod.Head, "https://www.google.com");
-            var response = await _httpClient.SendAsync(request, cts.Token);
+            using var request = new HttpRequestMessage(HttpMethod.Head, "https://download.mikrotik.com/");
+            using var response = await _httpClient.SendAsync(request, cts.Token);
 
-            var isConnected = response.IsSuccessStatusCode;
-            _logger.LogInformation("Internet connectivity: {Status}", isConnected ? "✓ OK" : "✗ FAILED");
+            var isConnected = (int)response.StatusCode < 500;
+            _logger.LogInformation("MikroTik download server connectivity: {Status}",
+                isConnected ? "✓ OK" : "✗ FAILED");
             return isConnected;
+        }
+        catch (TaskCanceledException)
+        {
+            _logger.LogWarning("MikroTik download server timeout");
+            return false;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning("MikroTik download server connectivity check failed: {Message}", ex.Message);
+            return false;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Internet connectivity check failed");
+            _logger.LogWarning(ex, "MikroTik download server connectivity check failed");
             return false;
         }
     }

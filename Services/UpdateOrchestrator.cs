@@ -87,12 +87,12 @@ internal sealed class UpdateOrchestrator(
 
             // 1. Проверяем подключение
             var mikrotikOk = await connectivityService.CheckMikroTikConnectivityAsync();
-            var internetOk = await connectivityService.CheckInternetConnectivityAsync();
+            var downloadServerOk = await connectivityService.CheckInternetConnectivityAsync();
 
-            if (!mikrotikOk || !internetOk)
+            if (!mikrotikOk || !downloadServerOk)
             {
-                logger.LogWarning("Connectivity check failed - MikroTik: {MikroTik}, Internet: {Internet}",
-                    mikrotikOk ? "✓" : "✗", internetOk ? "✓" : "✗");
+                logger.LogWarning("Connectivity check failed - upgrade server: {Upgrade}, download server: {Download}",
+                    mikrotikOk ? "✓" : "✗", downloadServerOk ? "✓" : "✗");
                 result.Error = "network_unavailable";
                 return result;
             }
@@ -600,6 +600,18 @@ internal sealed class UpdateOrchestrator(
                 }
             }
 
+            if (TryGetV7ExtraPackageArch(normalizedVersion, normalizedFilename, out var arch))
+            {
+                var localPath = BuildOnDemandLocalPath(normalizedVersion, normalizedFilename);
+                var extracted = await ExtractV7ExtraPackagesFromArchiveAsync(
+                    normalizedVersion,
+                    arch,
+                    Path.GetDirectoryName(localPath)!,
+                    [normalizedFilename]);
+                if (extracted > 0)
+                    return localPath;
+            }
+
             return null;
         }
         finally
@@ -869,6 +881,22 @@ internal sealed class UpdateOrchestrator(
         return Path.Combine(GetRouterOsBaseFolder(), branchFolder, version, filename);
     }
 
+    private static bool TryGetV7ExtraPackageArch(string version, string filename, out string arch)
+    {
+        arch = "";
+        if (!filename.EndsWith(".npk", StringComparison.OrdinalIgnoreCase) ||
+            filename.StartsWith("routeros-", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var marker = $"-{version}-";
+        var markerIndex = filename.LastIndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (markerIndex < 1)
+            return false;
+
+        arch = filename[(markerIndex + marker.Length)..^4];
+        return !string.IsNullOrWhiteSpace(arch);
+    }
+
     private static HttpClient CreateUpstreamClient()
     {
         var client = new HttpClient
@@ -886,8 +914,8 @@ internal sealed class UpdateOrchestrator(
         var result = new UpdateCheckResult {Timestamp = DateTime.UtcNow};
 
         var mikrotikOk = await connectivityService.CheckMikroTikConnectivityAsync();
-        var internetOk = await connectivityService.CheckInternetConnectivityAsync();
-        if (!mikrotikOk || !internetOk)
+        var downloadServerOk = await connectivityService.CheckInternetConnectivityAsync();
+        if (!mikrotikOk || !downloadServerOk)
         {
             result.Error = "network_unavailable";
             return result;
@@ -988,6 +1016,7 @@ internal sealed class UpdateOrchestrator(
         foreach (var arch in allowedArches.Where(a => !string.IsNullOrWhiteSpace(a)))
         {
             var normalizedArch = arch.Trim();
+            var unavailableExtraPackages = new List<string>();
             var fileNames = isV6
                 ? new[] { BuildPackageFileName(version, normalizedArch, true) }
                 : new[] { BuildPackageFileName(version, normalizedArch, false) }
@@ -1002,12 +1031,18 @@ internal sealed class UpdateOrchestrator(
                 var url = $"https://download.mikrotik.com/routeros/{version}/{fileName}";
                 var isV7ExtraPackage = !isV6 && !fileName.StartsWith("routeros-", StringComparison.OrdinalIgnoreCase);
                 if (isV7ExtraPackage && _unavailableV7ExtraPackageUrls.ContainsKey(url))
+                {
+                    unavailableExtraPackages.Add(fileName);
                     continue;
+                }
 
                 if (!await IsRemoteFileAvailableAsync(url))
                 {
                     if (isV7ExtraPackage)
+                    {
                         _unavailableV7ExtraPackageUrls.TryAdd(url, 0);
+                        unavailableExtraPackages.Add(fileName);
+                    }
                     continue;
                 }
 
@@ -1022,7 +1057,18 @@ internal sealed class UpdateOrchestrator(
                     if (isV6)
                         ExtractAndCleanV6Packages(localPath);
                 }
+                else if (isV7ExtraPackage)
+                {
+                    unavailableExtraPackages.Add(fileName);
+                }
             }
+
+            if (!isV6 && unavailableExtraPackages.Count > 0)
+                downloaded += await ExtractV7ExtraPackagesFromArchiveAsync(
+                    version,
+                    normalizedArch,
+                    versionDir,
+                    unavailableExtraPackages);
         }
 
         await EnsureChangelogAsync(version, isV6);
@@ -1059,6 +1105,54 @@ internal sealed class UpdateOrchestrator(
         return isV6
             ? $"all_packages-{arch}-{version}.zip"
             : $"routeros-{arch}-{version}.npk";
+    }
+
+    private async Task<int> ExtractV7ExtraPackagesFromArchiveAsync(
+        string version,
+        string arch,
+        string versionDir,
+        IReadOnlyCollection<string> packageFiles)
+    {
+        var archiveName = $"all_packages-{arch}-{version}.zip";
+        var archivePath = Path.Combine(versionDir, archiveName);
+        var archiveUrl = $"https://download.mikrotik.com/routeros/{version}/{archiveName}";
+
+        if (!File.Exists(archivePath) || new FileInfo(archivePath).Length == 0)
+        {
+            if (!await IsRemoteFileAvailableAsync(archiveUrl))
+                return 0;
+
+            var result = await downloadService.DownloadFileAsync(archiveUrl, archivePath);
+            if (!result.Success)
+                return 0;
+        }
+
+        var extracted = 0;
+        using var archive = ZipFile.OpenRead(archivePath);
+        foreach (var packageFile in packageFiles.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var destination = Path.Combine(versionDir, packageFile);
+            if (File.Exists(destination) && new FileInfo(destination).Length > 0)
+                continue;
+
+            var archiveEntryName = packageFile.EndsWith($"-{arch}.npk", StringComparison.OrdinalIgnoreCase)
+                ? $"{packageFile[..^(arch.Length + 5)]}.npk"
+                : packageFile;
+            var entry = archive.GetEntry(archiveEntryName);
+            if (entry is null)
+                continue;
+
+            entry.ExtractToFile(destination, true);
+            NotFoundCacheMiddleware.InvalidatePath($"/routeros/{version}/{packageFile}");
+            extracted++;
+        }
+
+        logger.LogInformation(
+            "RouterOS v7 archive {Archive}: extracted {Extracted}/{Requested} extra packages",
+            archiveName,
+            extracted,
+            packageFiles.Count);
+        return extracted;
     }
 
     private async Task<bool> IsRemoteFileAvailableAsync(string url)
